@@ -12,6 +12,8 @@ TagManager:
   - Legtop
   - LegBot
   - Body
+  - Ground
+  - Enemy
   layers:
   - Default
   - TransparentFX
@@ -19,7 +21,7 @@ TagManager:
   - 
   - Water
   - UI
-  - 
+  - Enemy
   - 
   - 
   - 
