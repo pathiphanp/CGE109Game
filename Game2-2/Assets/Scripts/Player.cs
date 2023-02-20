@@ -78,6 +78,8 @@ public class Player : MonoBehaviour, TakeDamage<float>
     // Update is called once per frame
     void Update()
     {
+        this.transform.InverseTransformPoint(enemy.transform.position);
+        Debug.Log(this.transform.InverseTransformPoint(enemy.transform.position));
         ControllerMove();
         StopGame();
         LookEnemy();
@@ -96,7 +98,7 @@ public class Player : MonoBehaviour, TakeDamage<float>
         Vector3 direction = ((transform.right * horizontrol + transform.forward * vertical) + new Vector3(0, 0, 0)).normalized;
         if (direction.magnitude >= 0.1f)
         {
-            controller.Move(direction * speed * Time.unscaledDeltaTime);
+            controller.Move(direction * speed * Time.deltaTime);
         }
         anim.SetFloat("MoveWalk", vertical);
     }
@@ -138,6 +140,7 @@ public class Player : MonoBehaviour, TakeDamage<float>
             speedLookEnemy += Time.deltaTime;
             float percentComlete = speedLookEnemy / speedDuration;
             relativePosition = enemy.transform.position - transform.position;
+            relativePosition = new Vector3(relativePosition.x, 0, relativePosition.z);
             enemyRotation = Quaternion.LookRotation(relativePosition);
             transform.rotation = Quaternion.Lerp(transform.rotation, enemyRotation, percentComlete);
         }
