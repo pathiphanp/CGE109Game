@@ -9,6 +9,9 @@ public class Player : MonoBehaviour, TakeDamage<float>
 
     [Header("Move")]
     [SerializeField] float speed;
+    [SerializeField] float maxSpeed;
+    [SerializeField] float spinSpeed;
+
 
     [Header("Sensitivity")]
     [SerializeField] float zoomSpeed;
@@ -19,11 +22,6 @@ public class Player : MonoBehaviour, TakeDamage<float>
     float mouseY;
     float _rotationY;
     float _rotationX;
-
-    [Header("Out_Of_Focus")]
-    Quaternion lastRotation;
-    Vector3 lastTranfrom;
-
 
     [Header("Allstatus")]
     [SerializeField] public float hp;
@@ -48,13 +46,10 @@ public class Player : MonoBehaviour, TakeDamage<float>
     [SerializeField] float radius;
     public GameObject findEnemy;
     [SerializeField] LayerMask layer;
-    [SerializeField] float maxDistance;
-    [SerializeField] GameObject[] left;
-    [SerializeField] int leftIndex;
-    [SerializeField] GameObject[] right;
-    [SerializeField] int rightIndex;
-    float[] dot;
-    Vector3 dirToTarget;
+    [SerializeField] GameObject findNextEnemy;
+    [SerializeField] Vector3[] nextEnemy;
+
+    Vector3 o = Vector3.zero;
 
     [Header("Camera")]
     public GameObject myCamera;
@@ -69,7 +64,7 @@ public class Player : MonoBehaviour, TakeDamage<float>
     // Start is called before the first frame update
     void Start()
     {
-
+        findNextEnemy = new GameObject("find next enemy");
     }
     private void FixedUpdate()
     {
@@ -78,13 +73,12 @@ public class Player : MonoBehaviour, TakeDamage<float>
     // Update is called once per frame
     void Update()
     {
-        this.transform.InverseTransformPoint(enemy.transform.position);
-        Debug.Log(this.transform.InverseTransformPoint(enemy.transform.position));
         ControllerMove();
         StopGame();
         LookEnemy();
         LookAround();
         CheckEnemyAround();
+        Change();
     }
 
     void Gravity()
@@ -98,6 +92,14 @@ public class Player : MonoBehaviour, TakeDamage<float>
         Vector3 direction = ((transform.right * horizontrol + transform.forward * vertical) + new Vector3(0, 0, 0)).normalized;
         if (direction.magnitude >= 0.1f)
         {
+            if (Input.GetKeyDown("left shift"))
+            {
+                speed *= 2;
+            }
+            else if (Input.GetKeyUp("left shift"))
+            {
+                speed = maxSpeed;
+            }
             controller.Move(direction * speed * Time.deltaTime);
         }
         anim.SetFloat("MoveWalk", vertical);
@@ -121,20 +123,20 @@ public class Player : MonoBehaviour, TakeDamage<float>
             Time.timeScale = time;
         }
     }
-
     void LookEnemy()
     {
-        leftIndex = Mathf.Clamp(leftIndex, 0, allEnemy.Length - 1);
-        rightIndex = Mathf.Clamp(rightIndex, 0, allEnemy.Length - 1);
-        lastRotation = transform.rotation;
-        lastTranfrom = transform.position;
-        if (Input.GetKeyDown("q"))
+        //ทำการกดปุ่มเพื่อมองหาศัตรูที่ไกล้ที่สุด
+        if (enemy != null)
         {
-            lookEnemy = !lookEnemy;
-            canlookAround = !canlookAround;
-            speedLookEnemy = 0;
-            canFindEnemy = !canFindEnemy;
+            if (Input.GetKeyDown("q"))
+            {
+                lookEnemy = !lookEnemy;
+                canlookAround = !canlookAround;
+                speedLookEnemy = 0;
+                canFindEnemy = !canFindEnemy;
+            }
         }
+
         if (lookEnemy)
         {
             speedLookEnemy += Time.deltaTime;
@@ -143,6 +145,7 @@ public class Player : MonoBehaviour, TakeDamage<float>
             relativePosition = new Vector3(relativePosition.x, 0, relativePosition.z);
             enemyRotation = Quaternion.LookRotation(relativePosition);
             transform.rotation = Quaternion.Lerp(transform.rotation, enemyRotation, percentComlete);
+
         }
     }
     void LookAround()
@@ -158,51 +161,81 @@ public class Player : MonoBehaviour, TakeDamage<float>
             myCamera.transform.localEulerAngles = new Vector3(_rotationX,0, 0);*/
         }
     }
-
     void CheckEnemyAround()
     {
-        allEnemy = Physics.OverlapSphere(findEnemy.transform.position, radius, layer);
-        left = new GameObject[allEnemy.Length];
-        right = new GameObject[allEnemy.Length];
+        allEnemy = Physics.OverlapSphere(findEnemy.transform.position, radius, layer);//เช็คจำนวนEnemy
         _distance = new float[allEnemy.Length];
-        dot = new float[allEnemy.Length];
-
-        //หาตัวระยะห่างทุกตัว
-        for (int i = 0; i < allEnemy.Length; i++)
+        if (allEnemy.Length != 0)//เช็คว่ามีศัตรู
         {
-            _distance[i] = Vector3.Distance(transform.position, allEnemy[i].gameObject.transform.position);
-        }
-        //ค่าของระทางแรกที่ไปใช้วัด
-        tamp_distance = _distance[0];
-        //หาระยะทางที่ไกล้ที่สุด
-        if (canFindEnemy)
-        {
-            for (int i = 0; i < allEnemy.Length; i++)
+            if (allEnemy[0] != null)
             {
-                /*Debug.Log("ระยะทางที่เข้ามา" + " : " + _distance[i]);
-                Debug.Log("ระยะทางตัวต้นที่ใช่วัด" + " : " + tamp_distance);*/
-                if (tamp_distance >= _distance[i])
+                //หาตัวระยะห่างทุกตัว
+                for (int i = 0; i < allEnemy.Length; i++)
                 {
-                    tamp_distance = _distance[i];
-                    enemy = allEnemy[i].gameObject;
-                    /*Debug.Log("หาผู้ที่มีระยะทางน้อยสุด" + " : " + _distance[i]);
-                    Debug.Log("ผู้ที่มีระยะน้อยสุด" + " : " + tamp_distance);*/
+                    _distance[i] = Vector3.Distance(transform.position, allEnemy[i].gameObject.transform.position);
+                }
+
+                //ค่าของระทางแรกที่ไปใช้วัด
+                tamp_distance = _distance[0];
+
+                //หาระยะทางที่ไกล้ที่สุด
+                if (canFindEnemy)
+                {
+                    for (int i = 0; i < allEnemy.Length; i++)
+                    {
+                        /*Debug.Log("ระยะทางที่เข้ามา" + " : " + _distance[i]);
+                        Debug.Log("ระยะทางตัวต้นที่ใช่วัด" + " : " + tamp_distance);*/
+                        if (tamp_distance >= _distance[i])
+                        {
+                            tamp_distance = _distance[i];
+                            enemy = allEnemy[i].gameObject;
+                            /*Debug.Log("หาผู้ที่มีระยะทางน้อยสุด" + " : " + _distance[i]);
+                            Debug.Log("ผู้ที่มีระยะน้อยสุด" + " : " + tamp_distance);*/
+                        }
+                    }
                 }
             }
         }
-
-        //หาว่าใครอยู่ซ้ายกับขวา
+        else
+        {
+            enemy = null;
+        }
+    }
+    void Change()
+    {
+        if (enemy != null)
+        {
+            findNextEnemy.transform.position = enemy.transform.position;
+            findNextEnemy.transform.localRotation = enemy.transform.localRotation;
+        }
+        nextEnemy = new Vector3[allEnemy.Length];
+        // xติดลบ = :ซ้าย || xเป็นบวก = ขวา
+        // zบวก = หน้า || zลบ = หลัง
+        // z ไกล้ 0 จะมีค่ามากกว่า 
+        //หาว่า X ใครไกล้กว่า จ่านั้น เช็คว่า Y ใครไกล้กว่า
         for (int i = 0; i < allEnemy.Length; i++)
         {
-            dirToTarget = Vector3.Normalize(transform.position - allEnemy[i].transform.position);
-            dot[i] = Vector3.Dot(transform.right, dirToTarget);
-            if (dot[i] > 0)
+            nextEnemy[i] = findNextEnemy.transform.InverseTransformPoint(allEnemy[i].gameObject.transform.position);
+            //เอา nextEnemy.x,.z มาเปรียบเทียบกับตัวอื่น
+            //ตัวที่ 1 มาเทียบตัวที่ 2
+            //i 0 เปรียบเทียบ i 1
+            int last_i = 0;
+            if (nextEnemy[i].x < 0 && nextEnemy[i].z > nextEnemy[last_i].z && nextEnemy[i].x != 0)
             {
-                left[i] = allEnemy[i].gameObject;
+                Debug.Log("Left : " + allEnemy[last_i].gameObject.name + nextEnemy[i]);
             }
-            else if (dot[i] < 0)
+            last_i++;
+            /*if (nextEnemy[i].x > 0 && nextEnemy[i].x != 0)
             {
-                right[i] = allEnemy[i].gameObject;
+                Debug.Log("Right  : " + allEnemy[i].gameObject.name + nextEnemy[i]);
+            }*/
+            if (Input.GetAxisRaw("Mouse X") < -5)//สปัดเม้าไปทางซ้าย
+            {
+
+            }
+            else if (Input.GetAxisRaw("Mouse X") > 5)//สปัดเม้าไปทางขวา
+            {
+
             }
         }
     }
